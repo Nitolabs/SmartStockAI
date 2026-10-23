@@ -370,10 +370,4 @@ La propuesta completa (servicio seleccionado, beneficios, costos aproximados y a
 
 ## Documentación
 
-| Documento | Contenido |
-|---|---|
-| [`docs/manual-usuario.md`](docs/manual-usuario.md) | Acceso al sistema, funcionalidades y uso de la IA |
-| [`docs/manual-tecnico.md`](docs/manual-tecnico.md) | Arquitectura, tecnologías, estructura, configuración, integración de IA y Docker |
-| [`docs/pruebas-automatizadas.md`](docs/pruebas-automatizadas.md) | Estrategia de pruebas, trazabilidad y cómo generar la evidencia |
-| [`docs/azure.md`](docs/azure.md) | Propuesta de despliegue en Azure |
-| [`database/`](database/) | Esquema SQL y notas de la base de datos |
+Documentos requeridos para la entrega del proyecto, Manual de Usuario, Manual Técnico y Propuesta de despliegue en Azure.
