@@ -1,0 +1,197 @@
+@model DashboardDto
+@{
+    ViewData["Title"] = "Dashboard";
+    var puedeVerIA = User.IsInRole(AppRoles.Administrador) || User.IsInRole(AppRoles.Inventario);
+}
+
+<h2 class="ss-title mb-4">Dashboard</h2>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
+        <div class="ss-kpi d-flex justify-content-between align-items-start">
+            <div>
+                <div class="ss-kpi-label">Ventas de hoy</div>
+                <div class="ss-kpi-value">$@Model.VentasHoy.ToString("N2")</div>
+            </div>
+            <div class="ss-kpi-icon"><i class="fa-solid fa-sack-dollar"></i></div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="ss-kpi d-flex justify-content-between align-items-start">
+            <div>
+                <div class="ss-kpi-label">Ventas del mes</div>
+                <div class="ss-kpi-value">$@Model.VentasMes.ToString("N2")</div>
+            </div>
+            <div class="ss-kpi-icon"><i class="fa-solid fa-chart-column"></i></div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="ss-kpi d-flex justify-content-between align-items-start">
+            <div>
+                <div class="ss-kpi-label">Valor del inventario</div>
+                <div class="ss-kpi-value">$@Model.ValorInventario.ToString("N2")</div>
+            </div>
+            <div class="ss-kpi-icon"><i class="fa-solid fa-warehouse"></i></div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="ss-kpi d-flex justify-content-between align-items-start">
+            <div>
+                <div class="ss-kpi-label">Productos con stock bajo</div>
+                <div class="ss-kpi-value">@Model.ProductosStockBajo</div>
+            </div>
+            <div class="ss-kpi-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+        </div>
+    </div>
+</div>
+
+<h4 class="ss-title mb-3">Resumen</h4>
+<div class="row g-3">
+    <div class="col-lg-7">
+        <div class="ss-panel mb-3">
+            <div class="ss-panel-title">Tendencia de ventas (últimos 7 días)</div>
+            <canvas id="chartTendencia" height="110"></canvas>
+        </div>
+        <div class="ss-panel mb-3">
+            <div class="ss-panel-title">Productos más vendidos este mes</div>
+            @if (!Model.ProductosMasVendidos.Any())
+            {
+                <p class="text-muted small mb-0">Aún no hay ventas registradas este mes.</p>
+            }
+            else
+            {
+                <table class="table table-ss mb-0">
+                    <thead><tr><th>Producto</th><th>Cantidad</th><th>Total</th></tr></thead>
+                    <tbody>
+                    @foreach (var p in Model.ProductosMasVendidos)
+                    {
+                        <tr><td>@p.ProductoNombre</td><td>@p.CantidadVendida</td><td>$@p.TotalVendido.ToString("N2")</td></tr>
+                    }
+                    </tbody>
+                </table>
+            }
+        </div>
+        <div class="ss-panel">
+            <div class="ss-panel-title">Compras recientes (últimos 7 días)</div>
+            @if (!Model.ComprasRecientes.Any())
+            {
+                <p class="text-muted small mb-0">No hay compras registradas en los últimos 7 días.</p>
+            }
+            else
+            {
+                <table class="table table-ss mb-0">
+                    <thead><tr><th>Documento</th><th>Fecha</th><th>Proveedor</th><th>Total</th></tr></thead>
+                    <tbody>
+                    @foreach (var c in Model.ComprasRecientes)
+                    {
+                        <tr>
+                            <td>@c.NumeroDocumento</td>
+                            <td class="small">@c.Fecha.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                            <td>@c.ProveedorNombre</td>
+                            <td>$@c.Total.ToString("N2")</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            }
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="ss-panel mb-3">
+            <div class="ss-panel-title">Alertas de inventario</div>
+            @if (!Model.Alertas.Any())
+            {
+                <p class="text-muted small mb-0">No hay alertas activas. Todo el stock está en niveles saludables.</p>
+            }
+            else
+            {
+                foreach (var a in Model.Alertas)
+                {
+                    <div class="ss-alert-item @(a.Prioridad == "MEDIA" ? "media" : "")">
+                        <strong>@a.ProductoNombre</strong>
+                        <div class="small text-muted">@a.Mensaje</div>
+                    </div>
+                }
+            }
+        </div>
+
+        @if (puedeVerIA)
+        {
+            <div class="ss-panel mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="ss-panel-title mb-0"><i class="fa-solid fa-robot me-1"></i> Recomendaciones de IA</div>
+                    <button type="button" id="btnIaResumen" class="btn btn-sm btn-ss-primary">Generar</button>
+                </div>
+                <form id="formAntiForgery">@Html.AntiForgeryToken()</form>
+                <div id="iaResumen" class="small text-muted">Pulsa <strong>Generar</strong> para analizar tu inventario con IA. El análisis solo se ejecuta cuando lo pides.</div>
+                <div class="mt-2"><a asp-controller="Recomendaciones" asp-action="Index" class="small">Ver el análisis completo</a></div>
+            </div>
+        }
+
+        <div class="ss-panel">
+            <div class="ss-panel-title">Otros indicadores</div>
+            <ul class="list-unstyled mb-0 small">
+                <li class="mb-2"><i class="fa-solid fa-box text-muted me-2"></i>Productos vendidos hoy: <strong>@Model.ProductosVendidosHoy</strong></li>
+                <li><i class="fa-solid fa-truck text-muted me-2"></i>Compras en los últimos 7 días: <strong>@Model.ComprasRecientesCount</strong></li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+    new Chart(document.getElementById('chartTendencia'), {
+        type: 'line',
+        data: {
+            labels: [@Html.Raw(string.Join(",", Model.TendenciaVentas.Select(t => $"'{t.Fecha:dd/MM}'")))],
+            datasets: [{
+                label: 'Ventas ($)',
+                data: [@string.Join(",", Model.TendenciaVentas.Select(t => t.Total.ToString(System.Globalization.CultureInfo.InvariantCulture)))],
+                borderColor: '#4fba93',
+                backgroundColor: 'rgba(79,186,147,0.12)',
+                tension: 0.35,
+                fill: true
+            }]
+        },
+        options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+    });
+
+    @if (puedeVerIA)
+    {
+    <text>
+    const btnIa = document.getElementById('btnIaResumen');
+    if (btnIa) {
+        const prioridadTexto = { HIGH: 'Alta', MEDIUM: 'Media', LOW: 'Baja' };
+        btnIa.addEventListener('click', async () => {
+            const cont = document.getElementById('iaResumen');
+            btnIa.disabled = true;
+            cont.textContent = 'Analizando inventario...';
+            try {
+                const { ok, data } = await ssPostJson('/Recomendaciones/Resumen', {});
+                if (!ok) { cont.textContent = 'No se pudo generar el análisis.'; return; }
+
+                // Todo el texto (incluida la respuesta de la IA) se inserta escapado.
+                let html = '';
+                if (data.mensaje) html += `<div class="alert alert-warning py-1 px-2 mb-2">${ssEscape(data.mensaje)}</div>`;
+                if (!data.items.length) html += '<div>Sin recomendaciones por ahora.</div>';
+                data.items.forEach(i => {
+                    html += `<div class="ss-alert-item ${i.prioridad === 'HIGH' ? '' : 'media'}">
+                        <strong>${ssEscape(i.producto)}</strong>
+                        <span class="badge bg-secondary ms-1">${ssEscape(prioridadTexto[i.prioridad] || i.prioridad)}</span>
+                        <div>${ssEscape(i.recomendacion)}</div>
+                        <div class="text-muted">${ssEscape(i.razon)}</div>
+                        <div class="text-muted">Origen: ${ssEscape(i.origen)}</div></div>`;
+                });
+                cont.innerHTML = html;
+            } catch {
+                cont.textContent = 'No se pudo generar el análisis.';
+            } finally {
+                btnIa.disabled = false;
+            }
+        });
+    }
+    </text>
+    }
+</script>
+}

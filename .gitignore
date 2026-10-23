@@ -1,0 +1,30 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+*.DotSettings.user
+TestResults/
+*.trx
+
+## Publicación
+publish/
+*.pubxml
+*.pubxml.user
+
+## Bases de datos locales
+*.mdf
+*.ldf
+*.ndf
+
+## Secretos (nunca deben ir a Git)
+appsettings.Local.json
+.env
+*.pfx
+
+## SO / editores
+.DS_Store
+Thumbs.db
+.idea/
+*.swp

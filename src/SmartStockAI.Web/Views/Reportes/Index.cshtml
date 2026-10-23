@@ -1,0 +1,168 @@
+@model ReportesViewModel
+@{
+    ViewData["Title"] = "Reportes";
+    var categorias = (IReadOnlyList<CategoriaDto>)ViewBag.Categorias;
+    var proveedores = (IReadOnlyList<ProveedorDto>)ViewBag.Proveedores;
+    var productos = (IReadOnlyList<ProductoDto>)ViewBag.Productos;
+    var esAdmin = User.IsInRole(AppRoles.Administrador);
+
+    // Los reportes de ventas y rentabilidad son solo para el administrador.
+    var tabs = new List<(string Key, string Label)>();
+    if (esAdmin) { tabs.Add(("ventas", "Ventas")); tabs.Add(("mas-vendidos", "Más vendidos")); }
+    tabs.Add(("compras", "Compras"));
+    tabs.Add(("inventario", "Inventario"));
+    tabs.Add(("movimientos", "Movimientos"));
+    tabs.Add(("baja-rotacion", "Baja rotación"));
+    if (esAdmin) tabs.Add(("ganancias", "Ganancias estimadas"));
+
+    var f = Model.Filtro;
+    var usaFechas = Model.Tipo != "inventario" && Model.Tipo != "baja-rotacion";
+    var usaFiltros = Model.Tipo != "baja-rotacion";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="ss-title mb-0">Reportes</h2>
+    <a class="btn btn-ss-dark" href="@Url.Action("Exportar", new { tipo = Model.Tipo, desde = f.Desde, hasta = f.Hasta, productoId = f.ProductoId, categoriaId = f.CategoriaId, proveedorId = f.ProveedorId })">
+        <i class="fa-solid fa-file-arrow-down me-1"></i> Generar Reporte (CSV)
+    </a>
+</div>
+
+<ul class="nav nav-pills mb-3">
+    @foreach (var (key, label) in tabs)
+    {
+        <li class="nav-item">
+            <a class="nav-link @(Model.Tipo == key ? "active" : "")" style="@(Model.Tipo==key?"background:var(--ss-dark);":"color:var(--ss-text);")"
+               href="@Url.Action("Index", new { tipo = key, desde = f.Desde, hasta = f.Hasta, productoId = f.ProductoId, categoriaId = f.CategoriaId, proveedorId = f.ProveedorId })">@label</a>
+        </li>
+    }
+</ul>
+
+@if (usaFiltros)
+{
+    <form method="get" class="row g-2 mb-3">
+        <input type="hidden" name="tipo" value="@Model.Tipo" />
+        @if (usaFechas)
+        {
+            <div class="col-md-2"><label class="form-label small">Desde</label><input type="date" name="desde" value="@f.Desde?.ToString("yyyy-MM-dd")" class="form-control" /></div>
+            <div class="col-md-2"><label class="form-label small">Hasta</label><input type="date" name="hasta" value="@f.Hasta?.ToString("yyyy-MM-dd")" class="form-control" /></div>
+        }
+        <div class="col-md-3">
+            <label class="form-label small">Producto</label>
+            <select name="productoId" class="form-select">
+                <option value="">Todos</option>
+                @foreach (var p in productos) { <option value="@p.Id" selected="@(f.ProductoId == p.Id)">@p.Nombre</option> }
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small">Categoría</label>
+            <select name="categoriaId" class="form-select">
+                <option value="">Todas</option>
+                @foreach (var c in categorias) { <option value="@c.Id" selected="@(f.CategoriaId == c.Id)">@c.Nombre</option> }
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small">@(Model.Tipo == "compras" ? "Proveedor de la compra" : "Proveedor")</label>
+            <select name="proveedorId" class="form-select">
+                <option value="">Todos</option>
+                @foreach (var p in proveedores) { <option value="@p.Id" selected="@(f.ProveedorId == p.Id)">@p.Nombre</option> }
+            </select>
+        </div>
+        <div class="col-md-1 align-self-end"><button type="submit" class="btn btn-ss-outline w-100">Filtrar</button></div>
+    </form>
+}
+
+<div class="ss-panel">
+@if (Model.Tipo == "ventas")
+{
+    <table class="table table-ss mb-0">
+        <thead><tr><th>Fecha</th><th>Producto</th><th>Cantidad</th><th>Total</th></tr></thead>
+        <tbody>
+        @foreach (var r in Model.Ventas)
+        {
+            <tr><td class="small">@r.Fecha.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td><td>@r.ProductoNombre</td><td>@r.Cantidad</td><td>$@r.Total.ToString("N2")</td></tr>
+        }
+        </tbody>
+        <tfoot><tr class="fw-bold"><td colspan="2">Total</td><td>@Model.Ventas.Sum(x => x.Cantidad)</td><td>$@Model.Ventas.Sum(x => x.Total).ToString("N2")</td></tr></tfoot>
+    </table>
+}
+else if (Model.Tipo == "mas-vendidos")
+{
+    <table class="table table-ss mb-0">
+        <thead><tr><th>#</th><th>Producto</th><th>Categoría</th><th>Unidades</th><th>Total vendido</th><th>Ganancia estimada</th></tr></thead>
+        <tbody>
+        @{ var n = 0; }
+        @foreach (var r in Model.MasVendidos)
+        {
+            n++;
+            <tr><td>@n</td><td>@r.ProductoNombre</td><td>@r.CategoriaNombre</td><td>@r.CantidadVendida</td><td>$@r.TotalVendido.ToString("N2")</td><td>$@r.GananciaEstimada.ToString("N2")</td></tr>
+        }
+        </tbody>
+    </table>
+    <p class="text-muted small mt-2 mb-0">Top 10 por unidades vendidas en el período.</p>
+}
+else if (Model.Tipo == "compras")
+{
+    <table class="table table-ss mb-0">
+        <thead><tr><th>Fecha</th><th>Producto</th><th>Proveedor</th><th>Cantidad</th><th>Total</th></tr></thead>
+        <tbody>
+        @foreach (var r in Model.Compras)
+        {
+            <tr><td class="small">@r.Fecha.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td><td>@r.ProductoNombre</td><td>@r.ProveedorNombre</td><td>@r.Cantidad</td><td>$@r.Total.ToString("N2")</td></tr>
+        }
+        </tbody>
+        <tfoot><tr class="fw-bold"><td colspan="3">Total</td><td>@Model.Compras.Sum(x => x.Cantidad)</td><td>$@Model.Compras.Sum(x => x.Total).ToString("N2")</td></tr></tfoot>
+    </table>
+}
+else if (Model.Tipo == "inventario")
+{
+    <table class="table table-ss mb-0">
+        <thead><tr><th>Producto</th><th>Categoría</th><th>Stock actual</th><th>Stock mínimo</th><th>Valor en stock</th></tr></thead>
+        <tbody>
+        @foreach (var r in Model.Inventario)
+        {
+            <tr><td>@r.ProductoNombre</td><td>@r.CategoriaNombre</td><td>@r.StockActual</td><td>@r.StockMinimo</td><td>$@r.ValorStock.ToString("N2")</td></tr>
+        }
+        </tbody>
+        <tfoot><tr class="fw-bold"><td colspan="2">Total</td><td>@Model.Inventario.Sum(x => x.StockActual)</td><td></td><td>$@Model.Inventario.Sum(x => x.ValorStock).ToString("N2")</td></tr></tfoot>
+    </table>
+}
+else if (Model.Tipo == "movimientos")
+{
+    <table class="table table-ss mb-0">
+        <thead><tr><th>Fecha</th><th>Producto</th><th>Tipo</th><th>Motivo</th><th>Cantidad</th><th>Stock resultante</th><th>Usuario</th></tr></thead>
+        <tbody>
+        @foreach (var r in Model.Movimientos)
+        {
+            <tr><td class="small">@r.Fecha.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td><td>@r.ProductoNombre</td><td>@r.Tipo</td><td class="small text-muted">@r.Motivo</td><td>@r.Cantidad</td><td>@r.StockResultante</td><td class="small">@r.UsuarioNombre</td></tr>
+        }
+        </tbody>
+    </table>
+}
+else if (Model.Tipo == "baja-rotacion")
+{
+    <p class="text-muted small">Productos activos sin ventas en los últimos 30 días.</p>
+    <table class="table table-ss mb-0">
+        <thead><tr><th>Producto</th><th>Unidades vendidas (30 días)</th><th>Última venta</th></tr></thead>
+        <tbody>
+        @foreach (var r in Model.BajaRotacion)
+        {
+            <tr><td>@r.ProductoNombre</td><td>@r.UnidadesVendidasUltimos30Dias</td><td>@(r.UltimaVenta?.ToLocalTime().ToString("dd/MM/yyyy") ?? "Sin ventas registradas")</td></tr>
+        }
+        </tbody>
+    </table>
+}
+else if (Model.Tipo == "ganancias")
+{
+    <p class="text-muted small">Ganancia estimada = ventas − costo estimado (precio de compra vigente de cada producto).</p>
+    <table class="table table-ss mb-0">
+        <thead><tr><th>Fecha</th><th>Total ventas</th><th>Costo estimado</th><th>Ganancia estimada</th></tr></thead>
+        <tbody>
+        @foreach (var r in Model.Ganancias)
+        {
+            <tr><td class="small">@r.Fecha.ToString("dd/MM/yyyy")</td><td>$@r.TotalVentas.ToString("N2")</td><td>$@r.CostoEstimado.ToString("N2")</td><td>$@r.GananciaEstimada.ToString("N2")</td></tr>
+        }
+        </tbody>
+        <tfoot><tr class="fw-bold"><td>Total</td><td>$@Model.Ganancias.Sum(x => x.TotalVentas).ToString("N2")</td><td>$@Model.Ganancias.Sum(x => x.CostoEstimado).ToString("N2")</td><td>$@Model.Ganancias.Sum(x => x.GananciaEstimada).ToString("N2")</td></tr></tfoot>
+    </table>
+}
+</div>

@@ -1,0 +1,42 @@
+@model ConfiguracionViewModel
+@{ ViewData["Title"] = "Configuración"; }
+
+<h2 class="ss-title mb-4">Configuración</h2>
+
+<div class="row g-3">
+    <div class="col-lg-5">
+        <div class="ss-panel h-100">
+            <div class="ss-panel-title">Mi cuenta</div>
+            <dl class="row small mb-3">
+                <dt class="col-4">Nombre</dt><dd class="col-8">@Model.NombreCompleto</dd>
+                <dt class="col-4">Correo</dt><dd class="col-8">@Model.Email</dd>
+                <dt class="col-4">Rol</dt><dd class="col-8"><span class="badge bg-secondary">@Model.Rol</span></dd>
+            </dl>
+            <a asp-controller="Account" asp-action="ChangePassword" class="btn btn-ss-outline btn-sm"><i class="fa-solid fa-key me-1"></i> Cambiar contraseña</a>
+        </div>
+    </div>
+
+    @if (Model.Negocio is not null)
+    {
+        <div class="col-lg-7">
+            <div class="ss-panel">
+                <div class="ss-panel-title">Datos del negocio</div>
+                <form asp-action="GuardarNegocio" method="post" class="row g-3">
+                    <div class="col-md-8"><label class="form-label small">Nombre del negocio</label><input class="form-control" name="Nombre" value="@Model.Negocio.Nombre" required maxlength="150" /></div>
+                    <div class="col-md-4"><label class="form-label small">Rubro</label><input class="form-control" name="Rubro" value="@Model.Negocio.Rubro" maxlength="100" /></div>
+                    <div class="col-12"><label class="form-label small">Dirección</label><input class="form-control" name="Direccion" value="@Model.Negocio.Direccion" maxlength="250" /></div>
+                    <div class="col-md-6"><label class="form-label small">Teléfono</label><input class="form-control" name="Telefono" value="@Model.Negocio.Telefono" maxlength="30" /></div>
+                    <div class="col-md-6"><label class="form-label small">Correo</label><input type="email" class="form-control" name="Email" value="@Model.Negocio.Email" maxlength="150" /></div>
+                    <div class="col-12">
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="PermitirVentaSinStock" value="true" id="chkSinStock" checked="@Model.Negocio.PermitirVentaSinStock" />
+                            <label class="form-check-label" for="chkSinStock">Permitir vender sin stock suficiente</label>
+                        </div>
+                        <div class="form-text">Desactivado (recomendado): el sistema rechaza ventas que superen el stock. Activado: se permite y el stock puede quedar negativo; el faltante queda registrado en el historial y genera alerta.</div>
+                    </div>
+                    <div class="col-12"><button type="submit" class="btn btn-ss-primary">Guardar cambios</button></div>
+                </form>
+            </div>
+        </div>
+    }
+</div>

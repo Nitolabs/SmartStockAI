@@ -1,0 +1,222 @@
+@model PagedResult<ProductoDto>
+@{
+    ViewData["Title"] = "Productos";
+    var categorias = (IReadOnlyList<CategoriaDto>)ViewBag.Categorias;
+    var proveedores = (IReadOnlyList<ProveedorDto>)ViewBag.Proveedores;
+    var filtro = (ProductoBusquedaFiltro)ViewBag.Filtro;
+    // El vendedor consulta productos, pero no los modifica.
+    var puedeEditar = User.IsInRole(AppRoles.Administrador) || User.IsInRole(AppRoles.Inventario);
+}
+
+<h2 class="ss-title mb-3">Gestión de productos</h2>
+
+<form method="get" class="row g-2 align-items-center mb-3">
+    <div class="col-md-5">
+        <div class="input-group">
+            <span class="input-group-text bg-white small">Buscar producto:</span>
+            <input type="text" name="texto" value="@filtro.Texto" class="form-control ss-search-input" placeholder="Nombre, código o descripción" />
+        </div>
+    </div>
+    <div class="col-md-3">
+        <select name="categoriaId" class="form-select ss-search-input">
+            <option value="">Todas las categorías</option>
+            @foreach (var c in categorias)
+            {
+                <option value="@c.Id" selected="@(filtro.CategoriaId == c.Id)">@c.Nombre</option>
+            }
+        </select>
+    </div>
+    <div class="col-md-3 d-flex gap-3">
+        <div class="form-check">
+            <input type="checkbox" class="form-check-input" name="soloStockBajo" value="true" checked="@(filtro.SoloStockBajo == true)" id="chkStockBajo" />
+            <label class="form-check-label small" for="chkStockBajo">Stock bajo</label>
+        </div>
+        @if (puedeEditar)
+        {
+            <div class="form-check">
+                <input type="checkbox" class="form-check-input" name="incluirInactivos" value="true" checked="@filtro.IncluirInactivos" id="chkInactivos" />
+                <label class="form-check-label small" for="chkInactivos">Ver inactivos</label>
+            </div>
+        }
+    </div>
+    <div class="col-md-1">
+        <button type="submit" class="btn btn-ss-outline w-100">Buscar</button>
+    </div>
+</form>
+
+<div class="ss-panel mb-3">
+    <table class="table table-ss mb-0" id="tablaProductos">
+        <thead><tr><th style="width:110px;">ID</th><th>Descripción</th><th>Categoría</th><th>Stock</th><th>Precio</th></tr></thead>
+        <tbody>
+        @foreach (var p in Model.Items)
+        {
+            <tr class="ss-fila-producto" style="@(puedeEditar ? "cursor:pointer;" : "")"
+                data-id="@p.Id" data-nombre="@p.Nombre" data-sku="@p.Sku" data-descripcion="@p.Descripcion"
+                data-categoria="@p.CategoriaId" data-proveedor="@p.ProveedorId"
+                data-compra="@p.PrecioCompra.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+                data-venta="@p.PrecioVenta.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+                data-stock="@p.StockActual" data-minimo="@p.StockMinimo" data-activo="@p.Activo.ToString().ToLower()">
+                <td>@p.Sku</td>
+                <td>
+                    @p.Nombre
+                    @if (!p.Activo) { <span class="badge bg-secondary ms-1">Inactivo</span> }
+                    else if (p.TieneStockBajo) { <span class="badge badge-stock-bajo ms-1">Stock bajo</span> }
+                </td>
+                <td>@p.CategoriaNombre</td>
+                <td>@p.StockActual <span class="text-muted small">/ mín. @p.StockMinimo</span></td>
+                <td>$@p.PrecioVenta.ToString("N2")</td>
+            </tr>
+        }
+        @if (!Model.Items.Any())
+        {
+            <tr><td colspan="5" class="text-center text-muted small py-3">No hay productos que coincidan con la búsqueda.</td></tr>
+        }
+        </tbody>
+    </table>
+
+    @if (Model.TotalPages > 1)
+    {
+        <nav class="mt-3">
+            <ul class="pagination pagination-sm mb-0">
+                @for (int i = 1; i <= Model.TotalPages; i++)
+                {
+                    <li class="page-item @(i == Model.Page ? "active" : "")">
+                        <a class="page-link" href="@Url.Action("Index", new { texto = filtro.Texto, categoriaId = filtro.CategoriaId, soloStockBajo = filtro.SoloStockBajo, incluirInactivos = filtro.IncluirInactivos, page = i })">@i</a>
+                    </li>
+                }
+            </ul>
+        </nav>
+    }
+</div>
+
+@if (puedeEditar)
+{
+    <div class="d-flex gap-2 mb-3">
+        <button type="button" id="btnAgregar" class="btn btn-ss-dark" style="min-width:110px;">Agregar</button>
+        <button type="button" id="btnEditar" class="btn btn-ss-dark" style="min-width:110px;" disabled>Editar</button>
+        <button type="button" id="btnEliminar" class="btn btn-ss-dark" style="min-width:110px;" disabled>Eliminar</button>
+        <span id="lblSeleccion" class="small text-muted align-self-center ms-2">Selecciona una fila para editar o eliminar.</span>
+    </div>
+
+    <form id="formEliminar" asp-action="Deactivate" method="post" class="d-none"><input type="hidden" name="id" id="eliminarId" /></form>
+
+    <div class="ss-panel">
+        <div class="ss-panel-title" id="tituloForm">Nuevo producto</div>
+        <form id="formProducto" asp-action="Create" method="post" class="row g-3">
+            <input type="hidden" name="Id" id="fId" />
+            <div class="col-md-4"><label class="form-label small">Nombre / descripción</label><input class="form-control" name="Nombre" id="fNombre" required maxlength="150" /></div>
+            <div class="col-md-3"><label class="form-label small">Código / SKU</label><input class="form-control" name="Sku" id="fSku" required maxlength="50" /></div>
+            <div class="col-md-5"><label class="form-label small">Detalle</label><input class="form-control" name="Descripcion" id="fDescripcion" maxlength="500" /></div>
+            <div class="col-md-3">
+                <label class="form-label small">Categoría</label>
+                <select class="form-select" name="CategoriaId" id="fCategoria" required>
+                    <option value="">-- Selecciona --</option>
+                    @foreach (var c in categorias.Where(c => c.Activo))
+                    {
+                        <option value="@c.Id">@c.Nombre</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small">Proveedor</label>
+                <select class="form-select" name="ProveedorId" id="fProveedor">
+                    <option value="">-- Ninguno --</option>
+                    @foreach (var prov in proveedores.Where(p => p.Activo))
+                    {
+                        <option value="@prov.Id">@prov.Nombre</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2"><label class="form-label small">Precio compra</label><input type="number" step="0.01" min="0" class="form-control" name="PrecioCompra" id="fCompra" required /></div>
+            <div class="col-md-2"><label class="form-label small">Precio venta</label><input type="number" step="0.01" min="0" class="form-control" name="PrecioVenta" id="fVenta" required /></div>
+            <div class="col-md-2"><label class="form-label small">Stock mínimo</label><input type="number" min="0" class="form-control" name="StockMinimo" id="fMinimo" value="0" required /></div>
+            <div class="col-md-2" id="grupoStockInicial">
+                <label class="form-label small">Stock inicial</label>
+                <input type="number" min="0" class="form-control" name="StockInicial" id="fStockInicial" value="0" required />
+            </div>
+            <div class="col-md-2 d-none" id="grupoStockActual">
+                <label class="form-label small">Stock actual</label>
+                <input type="number" class="form-control" id="fStockActual" disabled />
+                <div class="form-text">Se modifica en Inventario.</div>
+            </div>
+            <div class="col-md-2 d-none align-self-end" id="grupoActivo">
+                <div class="form-check"><input type="checkbox" class="form-check-input" name="Activo" id="fActivo" value="true" /><label class="form-check-label small" for="fActivo">Activo</label></div>
+            </div>
+            <div class="col-12 text-center">
+                <button type="submit" class="btn btn-ss-primary px-5">Guardar</button>
+            </div>
+        </form>
+    </div>
+}
+
+@section Scripts {
+@if (puedeEditar)
+{
+<script>
+    const form = document.getElementById('formProducto');
+    const filas = document.querySelectorAll('.ss-fila-producto');
+    const btnEditar = document.getElementById('btnEditar');
+    const btnEliminar = document.getElementById('btnEliminar');
+    let seleccionada = null;
+
+    const urlCrear = '@Url.Action("Create")';
+    const urlEditar = '@Url.Action("Edit")';
+
+    function modoCrear() {
+        form.reset();
+        form.action = urlCrear;
+        document.getElementById('fId').value = '';
+        document.getElementById('tituloForm').textContent = 'Nuevo producto';
+        document.getElementById('grupoStockInicial').classList.remove('d-none');
+        document.getElementById('fStockInicial').disabled = false;
+        document.getElementById('grupoStockActual').classList.add('d-none');
+        document.getElementById('grupoActivo').classList.add('d-none');
+        document.getElementById('fActivo').disabled = true;   // no se envía al crear
+        document.getElementById('fNombre').focus();
+    }
+
+    function modoEditar(d) {
+        form.action = urlEditar;
+        document.getElementById('fId').value = d.id;
+        document.getElementById('fNombre').value = d.nombre;
+        document.getElementById('fSku').value = d.sku;
+        document.getElementById('fDescripcion').value = d.descripcion || '';
+        document.getElementById('fCategoria').value = d.categoria;
+        document.getElementById('fProveedor').value = d.proveedor || '';
+        document.getElementById('fCompra').value = d.compra;
+        document.getElementById('fVenta').value = d.venta;
+        document.getElementById('fMinimo').value = d.minimo;
+        document.getElementById('fStockActual').value = d.stock;
+        document.getElementById('fActivo').checked = d.activo === 'true';
+        document.getElementById('fActivo').disabled = false;
+        document.getElementById('tituloForm').textContent = 'Editar producto';
+        document.getElementById('grupoStockInicial').classList.add('d-none');
+        document.getElementById('fStockInicial').disabled = true;   // no se envía al editar
+        document.getElementById('grupoStockActual').classList.remove('d-none');
+        document.getElementById('grupoActivo').classList.remove('d-none');
+        document.getElementById('fNombre').focus();
+    }
+
+    filas.forEach(fila => fila.addEventListener('click', () => {
+        filas.forEach(f => f.classList.remove('table-active'));
+        fila.classList.add('table-active');
+        seleccionada = fila.dataset;
+        btnEditar.disabled = false;
+        btnEliminar.disabled = false;
+        document.getElementById('lblSeleccion').textContent = 'Seleccionado: ' + seleccionada.nombre;
+    }));
+
+    document.getElementById('btnAgregar').addEventListener('click', modoCrear);
+    btnEditar.addEventListener('click', () => { if (seleccionada) modoEditar(seleccionada); });
+    btnEliminar.addEventListener('click', () => {
+        if (!seleccionada) return;
+        if (confirm('¿Eliminar "' + seleccionada.nombre + '"? Se desactiva y deja de aparecer, pero su historial se conserva.')) {
+            document.getElementById('eliminarId').value = seleccionada.id;
+            document.getElementById('formEliminar').submit();
+        }
+    });
+
+    modoCrear();
+</script>
+}
+}

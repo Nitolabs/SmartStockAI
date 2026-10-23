@@ -1,0 +1,123 @@
+@model IReadOnlyList<UsuarioDto>
+@{
+    ViewData["Title"] = "Usuarios";
+    var actualId = (string)ViewBag.UsuarioActualId;
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="ss-title mb-0">Usuarios y roles</h2>
+    <button class="btn btn-ss-primary" data-bs-toggle="modal" data-bs-target="#modalCrear"><i class="fa-solid fa-user-plus me-1"></i> Agregar usuario</button>
+</div>
+
+<div class="ss-panel mb-3">
+    <p class="small text-muted mb-0">
+        <strong>Administrador:</strong> acceso total. <strong>Vendedor:</strong> consulta productos y registra ventas.
+        <strong>Inventario:</strong> gestiona productos, categorías, proveedores, inventario, compras, reportes de inventario e IA.
+    </p>
+</div>
+
+<div class="ss-panel">
+    <table class="table table-ss mb-0">
+        <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Estado</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var u in Model)
+        {
+            var esYo = u.Id == actualId;
+            <tr>
+                <td>@u.NombreCompleto @if (esYo) { <span class="badge bg-light text-dark border ms-1">Tú</span> }</td>
+                <td>@u.Email</td>
+                <td><span class="badge bg-secondary">@u.Rol</span></td>
+                <td>@if (u.Activo) { <span class="badge badge-stock-ok">Activo</span> } else { <span class="badge badge-stock-bajo">Inactivo</span> }</td>
+                <td class="text-end">
+                    <button class="btn btn-sm btn-ss-outline" title="Editar" data-bs-toggle="modal" data-bs-target="#modalEditar@(u.Id)"><i class="fa-solid fa-pen"></i></button>
+                    <button class="btn btn-sm btn-ss-outline" title="Restablecer contraseña" data-bs-toggle="modal" data-bs-target="#modalPass@(u.Id)"><i class="fa-solid fa-key"></i></button>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>
+
+@foreach (var u in Model)
+{
+    var esYo = u.Id == actualId;
+    <div class="modal fade" id="modalEditar@(u.Id)" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form asp-action="Edit" method="post">
+                    <div class="modal-header"><h5 class="modal-title">Editar usuario</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                    <div class="modal-body">
+                        <input type="hidden" name="Id" value="@u.Id" />
+                        <div class="mb-3"><label class="form-label">Nombre completo</label><input class="form-control" name="NombreCompleto" value="@u.NombreCompleto" required /></div>
+                        <div class="mb-3"><label class="form-label">Correo</label><input class="form-control" value="@u.Email" disabled /></div>
+                        <div class="mb-3">
+                            <label class="form-label">Rol</label>
+                            @* Un administrador no puede cambiar su propio rol: el campo se bloquea pero el valor se envía. *@
+                            @if (esYo) { <input type="hidden" name="Rol" value="@u.Rol" /> }
+                            <select class="form-select" name="Rol" disabled="@esYo" required>
+                                @foreach (var rol in AppRoles.Todos)
+                                {
+                                    <option value="@rol" selected="@(rol == u.Rol)">@rol</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="form-check">
+                            @if (esYo) { <input type="hidden" name="Activo" value="true" /> }
+                            <input type="checkbox" class="form-check-input" name="Activo" value="true" checked="@u.Activo" disabled="@esYo" id="act@(u.Id)" />
+                            <label class="form-check-label" for="act@(u.Id)">Activo (puede iniciar sesión)</label>
+                        </div>
+                        @if (esYo) { <div class="form-text">No puedes cambiar tu propio rol ni desactivarte.</div> }
+                    </div>
+                    <div class="modal-footer"><button type="submit" class="btn btn-ss-primary">Guardar</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalPass@(u.Id)" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form asp-action="ResetPassword" method="post">
+                    <div class="modal-header"><h5 class="modal-title">Restablecer contraseña</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                    <div class="modal-body">
+                        <input type="hidden" name="id" value="@u.Id" />
+                        <p class="small text-muted">Define una contraseña temporal para <strong>@u.NombreCompleto</strong> y compártesela de forma segura.</p>
+                        <label class="form-label">Nueva contraseña</label>
+                        <input type="password" class="form-control" name="nuevaContrasena" minlength="8" required autocomplete="new-password" />
+                        <div class="form-text">Mínimo 8 caracteres, con al menos una mayúscula y un número.</div>
+                    </div>
+                    <div class="modal-footer"><button type="submit" class="btn btn-ss-primary">Restablecer</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+}
+
+<div class="modal fade" id="modalCrear" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form asp-action="Create" method="post">
+                <div class="modal-header"><h5 class="modal-title">Nuevo usuario</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <div class="mb-3"><label class="form-label">Nombre completo</label><input class="form-control" name="NombreCompleto" required /></div>
+                    <div class="mb-3"><label class="form-label">Correo electrónico</label><input type="email" class="form-control" name="Email" required /></div>
+                    <div class="mb-3">
+                        <label class="form-label">Rol</label>
+                        <select class="form-select" name="Rol" required>
+                            @foreach (var rol in AppRoles.Todos)
+                            {
+                                <option value="@rol" selected="@(rol == AppRoles.Vendedor)">@rol</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Contraseña inicial</label>
+                        <input type="password" class="form-control" name="Contrasena" minlength="8" required autocomplete="new-password" />
+                        <div class="form-text">Mínimo 8 caracteres, con al menos una mayúscula y un número.</div>
+                    </div>
+                </div>
+                <div class="modal-footer"><button type="submit" class="btn btn-ss-primary">Crear usuario</button></div>
+            </form>
+        </div>
+    </div>
+</div>

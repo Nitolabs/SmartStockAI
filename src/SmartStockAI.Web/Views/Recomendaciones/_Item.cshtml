@@ -1,0 +1,14 @@
+@model RecomendacionItemDto
+<div class="ss-alert-item @(Model.Prioridad == "HIGH" ? "" : "media")">
+    <div class="d-flex justify-content-between align-items-start gap-2">
+        <div>
+            <strong>@Model.ProductoNombre</strong>
+            <span class="badge @RecomendacionUi.PrioridadClase(Model.Prioridad) ms-1">Prioridad @RecomendacionUi.PrioridadTexto(Model.Prioridad)</span>
+            <span class="badge bg-secondary ms-1">@RecomendacionUi.TipoTexto(Model.Tipo)</span>
+        </div>
+        <span class="small text-muted text-nowrap">Confianza @Model.Confianza.ToString("P0")</span>
+    </div>
+    <div class="mt-1">@Model.Recomendacion</div>
+    <div class="small text-muted">@Model.Razon</div>
+    <div class="small text-muted">Origen: @Model.Origen</div>
+</div>

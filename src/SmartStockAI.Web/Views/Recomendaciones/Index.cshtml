@@ -1,0 +1,85 @@
+@model RecomendacionesResultadoDto?
+@{ ViewData["Title"] = "Recomendaciones IA"; }
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="ss-title mb-0">Recomendaciones de IA</h2>
+    <form asp-action="Generar" method="post" onsubmit="var b=this.querySelector('button');b.disabled=true;b.innerHTML='<span class=&quot;spinner-border spinner-border-sm me-1&quot;></span> Analizando...';">
+        <button type="submit" class="btn btn-ss-primary"><i class="fa-solid fa-robot me-1"></i> Analizar inventario</button>
+    </form>
+</div>
+
+@if (Model is null)
+{
+    <div class="ss-panel">
+        <p class="mb-2">El sistema calcula las métricas de tu inventario con reglas determinísticas y luego usa inteligencia artificial para interpretarlas y sugerir acciones (reposición, productos de alta demanda, baja rotación).</p>
+        <p class="text-muted small mb-0">La IA es una ayuda para decidir: no modifica inventario ni crea compras por sí sola. Pulsa <strong>Analizar inventario</strong> para generar el análisis.</p>
+    </div>
+}
+else
+{
+    @if (!string.IsNullOrEmpty(Model.Mensaje))
+    {
+        <div class="alert @(Model.IaDisponible ? "alert-info" : "alert-warning")">@Model.Mensaje</div>
+    }
+
+    <div class="ss-panel mb-3">
+        <div class="ss-panel-title">1. Datos de entrada</div>
+        <p class="small text-muted">Únicos datos enviados al proveedor de IA (@Model.DatosEnviados.Products.Count productos, fecha @Model.DatosEnviados.Date.ToString("dd/MM/yyyy")). No se envían precios, proveedores ni datos de usuarios.</p>
+        <div style="max-height:320px;overflow:auto;">
+            <table class="table table-ss mb-0">
+                <thead><tr><th>Producto</th><th>Categoría</th><th>Stock</th><th>Mín.</th><th>Vendidos 30 d</th><th>Vendidos 30 d previos</th><th>Días sin venta</th></tr></thead>
+                <tbody>
+                @foreach (var p in Model.DatosEnviados.Products)
+                {
+                    <tr>
+                        <td>@p.Name</td><td>@p.Category</td><td>@p.Stock</td><td>@p.MinStock</td>
+                        <td>@p.SoldLast30Days</td><td>@p.SoldPrev30Days</td>
+                        <td>@(p.DaysSinceLastSale?.ToString() ?? "Sin ventas")</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="ss-panel mb-3">
+        <div class="ss-panel-title">2. Procesamiento</div>
+        <ul class="small mb-0">
+            <li><strong>Reglas determinísticas (backend):</strong> stock actual ≤ stock mínimo genera alerta, sin intervención de la IA.</li>
+            <li><strong>Análisis con IA:</strong> el proveedor recibe las métricas y devuelve recomendaciones en JSON, que el backend valida (productos existentes, tipos y prioridades permitidos).</li>
+            <li><strong>Proveedor:</strong> @Model.Proveedor @(Model.Modelo is null ? "" : $"· modelo {Model.Modelo}")</li>
+            <li><strong>Estado de la IA:</strong> @(Model.IaDisponible ? "respondió correctamente" : "no disponible")</li>
+            <li><strong>Duración total:</strong> @Model.DuracionMs ms</li>
+        </ul>
+    </div>
+
+    <div class="ss-panel mb-3">
+        <div class="ss-panel-title">3. Resultados</div>
+
+        <h6 class="mt-1">Alertas por reglas (@Model.AlertasPorRegla.Count)</h6>
+        @if (!Model.AlertasPorRegla.Any())
+        {
+            <p class="text-muted small">Ningún producto está en o por debajo de su stock mínimo.</p>
+        }
+        @foreach (var a in Model.AlertasPorRegla)
+        {
+            <partial name="_Item" model="a" />
+        }
+
+        <h6 class="mt-4">Recomendaciones de IA (@Model.RecomendacionesIA.Count)</h6>
+        @if (!Model.RecomendacionesIA.Any())
+        {
+            <p class="text-muted small">Sin recomendaciones de IA en este análisis.</p>
+        }
+        @foreach (var r in Model.RecomendacionesIA)
+        {
+            <partial name="_Item" model="r" />
+        }
+        <p class="text-muted small mt-3 mb-0">Las recomendaciones son sugerencias: revisa los datos antes de actuar.</p>
+    </div>
+
+    <div class="ss-panel">
+        <div class="ss-panel-title">4. Beneficio aportado</div>
+        <p class="small mb-0">Anticipa quiebres de stock y reposiciones, identifica productos que se están moviendo más o menos que el mes anterior, y explica el porqué con las métricas del propio negocio, para decidir qué comprar con menos intuición y más datos.</p>
+    </div>
+}

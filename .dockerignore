@@ -1,0 +1,14 @@
+**/bin/
+**/obj/
+**/.vs/
+**/*.user
+.git/
+.gitignore
+.env
+.env.*
+!.env.example
+docs/
+database/
+docker/
+*.md
+src/SmartStockAI.Tests/

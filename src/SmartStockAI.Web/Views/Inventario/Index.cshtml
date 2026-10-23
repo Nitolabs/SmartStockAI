@@ -1,0 +1,128 @@
+@model IReadOnlyList<MovimientoInventarioDto>
+@{
+    ViewData["Title"] = "Inventario";
+    var resumen = (InventarioResumenDto)ViewBag.Resumen;
+    var productos = (IReadOnlyList<ProductoDto>)ViewBag.Productos;
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="ss-title mb-0">Gestión de inventario</h2>
+    <button class="btn btn-ss-primary" data-bs-toggle="modal" data-bs-target="#modalAjuste"><i class="fa-solid fa-plus me-1"></i> Registrar movimiento</button>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
+        <div class="ss-kpi"><div class="ss-kpi-label">Total de productos</div><div class="ss-kpi-value">@resumen.TotalProductos</div></div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="ss-kpi"><div class="ss-kpi-label">Stock bajo</div><div class="ss-kpi-value">@resumen.ProductosStockBajo</div></div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="ss-kpi"><div class="ss-kpi-label">Valor del inventario</div><div class="ss-kpi-value">$@resumen.ValorTotalInventario.ToString("N2")</div></div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="ss-kpi"><div class="ss-kpi-label">Movimientos de hoy</div><div class="ss-kpi-value">@resumen.MovimientosHoy</div></div>
+    </div>
+</div>
+
+<div class="ss-panel mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="ss-panel-title mb-0">Stock actual</div>
+        <a class="btn btn-ss-primary btn-sm" href="@Url.Action("Exportar", "Reportes", new { tipo = "inventario" })"><i class="fa-solid fa-file-arrow-down me-1"></i> Generar Reporte</a>
+    </div>
+    <div style="max-height:340px;overflow:auto;">
+        <table class="table table-ss mb-0">
+            <thead><tr><th style="width:110px;">ID</th><th>Descripción</th><th>Stock</th><th>Mínimo</th><th>Precio</th></tr></thead>
+            <tbody>
+            @foreach (var p in productos)
+            {
+                <tr>
+                    <td>@p.Sku</td>
+                    <td>@p.Nombre @if (p.TieneStockBajo) { <span class="badge badge-stock-bajo ms-1">Stock bajo</span> }</td>
+                    <td>@p.StockActual</td>
+                    <td>@p.StockMinimo</td>
+                    <td>$@p.PrecioVenta.ToString("N2")</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="ss-panel">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="ss-panel-title mb-0">Historial de movimientos</div>
+        <form method="get" class="d-flex gap-2">
+            <select name="productoId" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="">Todos los productos</option>
+                @foreach (var p in productos)
+                {
+                    <option value="@p.Id">@p.Nombre</option>
+                }
+            </select>
+        </form>
+    </div>
+    <table class="table table-ss mb-0">
+        <thead><tr><th>Fecha</th><th>Producto</th><th>Tipo</th><th>Motivo</th><th>Cantidad</th><th>Stock resultante</th><th>Usuario</th></tr></thead>
+        <tbody>
+        @foreach (var m in Model)
+        {
+            <tr>
+                <td class="small">@m.Fecha.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                <td>@m.ProductoNombre</td>
+                <td>
+                    @if (m.Tipo == TipoMovimientoInventario.Entrada)
+                    {<span class="badge badge-stock-ok">Entrada</span>}
+                    else if (m.Tipo == TipoMovimientoInventario.Salida)
+                    {<span class="badge badge-stock-bajo">Salida</span>}
+                    else
+                    {<span class="badge bg-secondary">Ajuste</span>}
+                </td>
+                <td class="small text-muted">@m.Motivo</td>
+                <td>@m.Cantidad</td>
+                <td>@m.StockResultante</td>
+                <td class="small">@m.UsuarioNombre</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>
+
+<div class="modal fade" id="modalAjuste" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form asp-action="Ajustar" method="post">
+                <div class="modal-header"><h5 class="modal-title">Registrar movimiento manual</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Producto</label>
+                        <select class="form-select" name="ProductoId" required>
+                            @foreach (var p in productos)
+                            {
+                                <option value="@p.Id">@p.Nombre (stock actual: @p.StockActual)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Tipo de movimiento</label>
+                        <select class="form-select" name="Tipo" required>
+                            <option value="@((int)TipoMovimientoInventario.Entrada)">Entrada</option>
+                            <option value="@((int)TipoMovimientoInventario.Salida)">Salida</option>
+                            <option value="@((int)TipoMovimientoInventario.Ajuste)">Ajuste (fijar stock exacto)</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Cantidad</label>
+                        <input type="number" min="1" class="form-control" name="Cantidad" required />
+                        <div class="form-text">Para "Ajuste", ingresa el nuevo valor de stock exacto.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Observaciones</label>
+                        <textarea class="form-control" name="Observaciones" placeholder="Motivo del ajuste"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer"><button type="submit" class="btn btn-ss-primary">Registrar</button></div>
+            </form>
+        </div>
+    </div>
+</div>

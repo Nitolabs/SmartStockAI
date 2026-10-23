@@ -1,0 +1,192 @@
+@model PagedResult<CompraDto>
+@{
+    ViewData["Title"] = "Compras";
+    var proveedores = (IReadOnlyList<ProveedorDto>)ViewBag.Proveedores;
+}
+
+<h2 class="ss-title mb-4">Registro de compras</h2>
+
+<form id="formAntiForgery">@Html.AntiForgeryToken()</form>
+
+<div class="ss-panel mb-4">
+    <div class="row g-2 mb-3">
+        <div class="col-md-4">
+            <label class="form-label small">Proveedor</label>
+            <select id="proveedorId" class="form-select">
+                <option value="">-- Selecciona un proveedor --</option>
+                @foreach (var p in proveedores)
+                {
+                    <option value="@p.Id">@p.Nombre</option>
+                }
+            </select>
+        </div>
+    </div>
+
+    <table class="table table-ss mb-3">
+        <thead><tr><th>Producto</th><th>Cantidad</th><th>Costo unitario</th><th>Subtotal</th><th></th></tr></thead>
+        <tbody id="carritoBody">
+            <tr id="filaVacia"><td colspan="4" class="text-center text-muted small py-3">Busca un producto para agregarlo a la compra.</td></tr>
+        </tbody>
+    </table>
+
+    <div class="row g-2 align-items-end">
+        <div class="col-md-8 position-relative">
+            <label class="form-label small">Buscar producto</label>
+            <input type="text" id="buscarProducto" class="form-control ss-search-input" placeholder="Nombre o SKU..." autocomplete="off" />
+            <div id="resultadosProducto" class="list-group position-absolute w-100" style="z-index:1000;"></div>
+        </div>
+        <div class="col-md-4 text-end">
+            <div class="fs-5 fw-bold">Total: <span id="lblTotal">$0.00</span></div>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-end gap-2 mt-3">
+        <button type="button" id="btnLimpiar" class="btn btn-ss-outline">Limpiar</button>
+        <button type="button" id="btnEfectuarPago" class="btn btn-ss-primary"><i class="fa-solid fa-truck me-1"></i> Registrar compra</button>
+        <a class="btn btn-ss-dark" href="@Url.Action("Exportar", "Reportes", new { tipo = "compras" })"><i class="fa-solid fa-file-arrow-down me-1"></i> Generar Reporte</a>
+    </div>
+</div>
+
+<div class="ss-panel">
+    <div class="ss-panel-title">Compras recientes</div>
+    <table class="table table-ss mb-0">
+        <thead><tr><th>Documento</th><th>Fecha</th><th>Proveedor</th><th>Total</th><th>Estado</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var c in Model.Items)
+        {
+            <tr>
+                <td>@c.NumeroDocumento</td>
+                <td class="small">@c.Fecha.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                <td>@c.ProveedorNombre</td>
+                <td>$@c.Total.ToString("N2")</td>
+                <td>
+                    @if (c.Estado == EstadoDocumento.Completada)
+                    {<span class="badge badge-stock-ok">Completada</span>}
+                    else
+                    {<span class="badge badge-stock-bajo">Anulada</span>}
+                </td>
+                <td class="text-end">
+                    @if (c.Estado == EstadoDocumento.Completada)
+                    {
+                        <form asp-action="Anular" method="post" class="d-inline">
+                            <input type="hidden" name="id" value="@c.Id" />
+                            <button type="submit" class="btn btn-sm btn-ss-outline" onclick="return confirm('¿Anular esta compra? Se revertirá el inventario.');">Anular</button>
+                        </form>
+                    }
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>
+
+@if (Model.TotalPages > 1)
+{
+    <nav class="mt-3">
+        <ul class="pagination pagination-sm">
+            @for (int i = 1; i <= Model.TotalPages; i++)
+            {
+                <li class="page-item @(i == Model.Page ? "active" : "")"><a class="page-link" href="@Url.Action("Index", new { page = i })">@i</a></li>
+            }
+        </ul>
+    </nav>
+}
+
+@section Scripts {
+<script>
+let carrito = [];
+
+const buscarInput = document.getElementById('buscarProducto');
+const resultadosDiv = document.getElementById('resultadosProducto');
+
+buscarInput.addEventListener('input', ssDebounce(async () => {
+    const texto = buscarInput.value.trim();
+    resultadosDiv.innerHTML = '';
+    if (texto.length < 1) return;
+
+    const response = await fetch('/Compras/BuscarProductos?texto=' + encodeURIComponent(texto));
+    const productos = await response.json();
+
+    productos.forEach(p => {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'list-group-item list-group-item-action';
+        item.innerHTML = `<strong>${ssEscape(p.nombre)}</strong> <span class="text-muted small">(${ssEscape(p.sku)}) — costo actual: ${ssFormatMoney(p.precioCompra)}</span>`;
+        item.onclick = () => { agregarProducto(p); resultadosDiv.innerHTML = ''; buscarInput.value = ''; };
+        resultadosDiv.appendChild(item);
+    });
+}, 300));
+
+document.addEventListener('click', (e) => {
+    if (!resultadosDiv.contains(e.target) && e.target !== buscarInput) resultadosDiv.innerHTML = '';
+});
+
+function agregarProducto(p) {
+    const existente = carrito.find(x => x.productoId === p.id);
+    if (existente) {
+        existente.cantidad += 1;
+    } else {
+        carrito.push({ productoId: p.id, nombre: p.nombre, costoUnitario: p.precioCompra, cantidad: 1 });
+    }
+    renderCarrito();
+}
+
+function renderCarrito() {
+    const body = document.getElementById('carritoBody');
+    body.innerHTML = '';
+    if (carrito.length === 0) {
+        body.innerHTML = '<tr id="filaVacia"><td colspan="4" class="text-center text-muted small py-3">Busca un producto para agregarlo a la compra.</td></tr>';
+    }
+    carrito.forEach((item, idx) => {
+        const subtotal = item.cantidad * item.costoUnitario;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${ssEscape(item.nombre)}</td>
+            <td style="width:110px;"><input type="number" min="1" class="form-control form-control-sm" value="${item.cantidad}" onchange="cambiarCantidad(${idx}, this.value)" /></td>
+            <td style="width:130px;"><input type="number" min="0" step="0.01" class="form-control form-control-sm" value="${item.costoUnitario}" onchange="cambiarCosto(${idx}, this.value)" /></td>
+            <td>${ssFormatMoney(subtotal)}</td>
+            <td><button class="btn btn-sm btn-ss-outline" onclick="quitarProducto(${idx})"><i class="fa-solid fa-xmark"></i></button></td>
+        `;
+        body.appendChild(tr);
+    });
+    actualizarTotales();
+}
+
+function cambiarCantidad(idx, valor) {
+    carrito[idx].cantidad = Math.max(1, parseInt(valor) || 1);
+    renderCarrito();
+}
+function cambiarCosto(idx, valor) {
+    carrito[idx].costoUnitario = Math.max(0, parseFloat(valor) || 0);
+    renderCarrito();
+}
+function quitarProducto(idx) {
+    carrito.splice(idx, 1);
+    renderCarrito();
+}
+
+function actualizarTotales() {
+    const total = carrito.reduce((acc, i) => acc + (i.cantidad * i.costoUnitario), 0);
+    document.getElementById('lblTotal').textContent = ssFormatMoney(total);
+}
+
+document.getElementById('btnLimpiar').onclick = () => { carrito = []; renderCarrito(); };
+
+document.getElementById('btnEfectuarPago').onclick = async () => {
+    const proveedorId = document.getElementById('proveedorId').value;
+    if (!proveedorId) { alert('Selecciona un proveedor.'); return; }
+    if (carrito.length === 0) { alert('Agrega al menos un producto a la compra.'); return; }
+
+    const dto = {
+        proveedorId: parseInt(proveedorId),
+        detalles: carrito.map(i => ({ productoId: i.productoId, cantidad: i.cantidad, costoUnitario: i.costoUnitario }))
+    };
+
+    const { ok, data } = await ssPostJson('/Compras/Registrar', dto);
+    if (!ok) { alert(data.message || 'No se pudo registrar la compra.'); return; }
+
+    alert('Compra registrada; el inventario se actualizó automáticamente.');
+    window.location.reload();
+};
+</script>
+}

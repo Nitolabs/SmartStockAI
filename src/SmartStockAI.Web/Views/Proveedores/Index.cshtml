@@ -1,0 +1,78 @@
+@model IReadOnlyList<ProveedorDto>
+@{ ViewData["Title"] = "Proveedores"; }
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="ss-title mb-0">Proveedores</h2>
+    <button class="btn btn-ss-primary" data-bs-toggle="modal" data-bs-target="#modalCrear"><i class="fa-solid fa-plus me-1"></i> Agregar</button>
+</div>
+
+<div class="ss-panel">
+    <table class="table table-ss mb-0">
+        <thead><tr><th>Nombre</th><th>Contacto</th><th>Teléfono</th><th>Email</th><th>Estado</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var p in Model)
+        {
+            <tr>
+                <td>@p.Nombre</td>
+                <td>@p.Contacto</td>
+                <td>@p.Telefono</td>
+                <td>@p.Email</td>
+                <td>
+                    @if (p.Activo)
+                    {<span class="badge badge-stock-ok">Activo</span>}
+                    else
+                    {<span class="badge badge-stock-bajo">Inactivo</span>}
+                </td>
+                <td class="text-end">
+                    <button class="btn btn-sm btn-ss-outline" data-bs-toggle="modal" data-bs-target="#modalEditar@(p.Id)"><i class="fa-solid fa-pen"></i></button>
+                    @if (p.Activo)
+                    {
+                        <form asp-action="Deactivate" method="post" class="d-inline">
+                            <input type="hidden" name="id" value="@p.Id" />
+                            <button type="submit" class="btn btn-sm btn-ss-outline" onclick="return confirm('¿Desactivar este proveedor?');"><i class="fa-solid fa-trash"></i></button>
+                        </form>
+                    }
+                </td>
+            </tr>
+
+            <div class="modal fade" id="modalEditar@(p.Id)" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <form asp-action="Edit" method="post">
+                            <div class="modal-header"><h5 class="modal-title">Editar proveedor</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                            <div class="modal-body">
+                                <input type="hidden" name="Id" value="@p.Id" />
+                                <div class="mb-3"><label class="form-label">Nombre</label><input class="form-control" name="Nombre" value="@p.Nombre" required /></div>
+                                <div class="mb-3"><label class="form-label">Contacto</label><input class="form-control" name="Contacto" value="@p.Contacto" /></div>
+                                <div class="mb-3"><label class="form-label">Teléfono</label><input class="form-control" name="Telefono" value="@p.Telefono" /></div>
+                                <div class="mb-3"><label class="form-label">Email</label><input class="form-control" name="Email" value="@p.Email" /></div>
+                                <div class="mb-3"><label class="form-label">Dirección</label><input class="form-control" name="Direccion" value="@p.Direccion" /></div>
+                                <div class="form-check"><input type="checkbox" class="form-check-input" name="Activo" value="true" checked="@p.Activo" /><label class="form-check-label">Activo</label></div>
+                            </div>
+                            <div class="modal-footer"><button type="submit" class="btn btn-ss-primary">Guardar</button></div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        }
+        </tbody>
+    </table>
+</div>
+
+<div class="modal fade" id="modalCrear" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form asp-action="Create" method="post">
+                <div class="modal-header"><h5 class="modal-title">Nuevo proveedor</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <div class="mb-3"><label class="form-label">Nombre</label><input class="form-control" name="Nombre" required /></div>
+                    <div class="mb-3"><label class="form-label">Contacto</label><input class="form-control" name="Contacto" /></div>
+                    <div class="mb-3"><label class="form-label">Teléfono</label><input class="form-control" name="Telefono" /></div>
+                    <div class="mb-3"><label class="form-label">Email</label><input class="form-control" name="Email" /></div>
+                    <div class="mb-3"><label class="form-label">Dirección</label><input class="form-control" name="Direccion" /></div>
+                </div>
+                <div class="modal-footer"><button type="submit" class="btn btn-ss-primary">Guardar</button></div>
+            </form>
+        </div>
+    </div>
+</div>
