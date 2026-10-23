@@ -222,8 +222,8 @@ dotnet ef migrations script -i -p SmartStockAI.Infrastructure -s SmartStockAI.We
 ### 1. Clonar y configurar
 
 ```bash
-git clone <URL-DEL-REPOSITORIO>
-cd <carpeta-del-repositorio>
+git clone https://github.com/Nitolabs/SmartStockAI.git
+cd SmartStockAI
 cp .env.example .env
 ```
 
